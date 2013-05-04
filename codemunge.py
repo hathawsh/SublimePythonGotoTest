@@ -1,4 +1,9 @@
 
+"""Quick and dirty extraction of 'def' and 'class' statements from Python code.
+
+Uses trivial regular expressions. Works even in the face of syntax errors. :-)
+"""
+
 import re
 import weakref
 
@@ -18,6 +23,18 @@ class Decl(object):
         self.last_row = last_row
         self.children = children or []
         self.parent_ref = None  # A weakref.ref
+
+    def get_path(self):
+        path = []
+        decl = self
+        while decl is not None:
+            path.append(decl)
+            parent = decl.parent_ref()
+            if parent is None or isinstance(parent, ModuleDecl):
+                break
+            decl = parent
+        path.reverse()
+        return path
 
     def __repr__(self):
         return ('{0}({1!r}, {2!r}, {3!r}, {4!r}, {5!r})'
