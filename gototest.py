@@ -8,47 +8,6 @@ import sublime_plugin
 _deferred = {}  # {filename: CodeNav}
 
 
-class BasicTestGenerator(object):
-    test_head_template = '''\
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
-
-'''
-
-    function_test_template = """\
-class {testname}(unittest.TestCase):
-
-    def _call(self, *args, **kw):
-        from ..{relmodule} import {name}
-        return {name}(*args, **kw)
-
-"""
-
-    class_test_template = """\
-class {testname}(unittest.TestCase):
-
-    @property
-    def _class(self):
-        from ..{relmodule} import {name}
-        return {name}
-
-    def _make(self):
-        return self._class()
-
-"""
-
-    def make_test_head(self, template_vars):
-        return self.test_head_template.format(**template_vars)
-
-    def make_function_test(self, template_vars):
-        return self.function_test_template.format(**template_vars)
-
-    def make_class_test(self, template_vars):
-        return self.class_test_template.format(**template_vars)
-
-
 class GotoTestCommand(sublime_plugin.TextCommand):
     generate = False
 
@@ -333,3 +292,44 @@ class TestCodeNavigator(CodeNavigator):
 class MainCodeNavigator(CodeNavigator):
     def goto(self, target_view):
         pass
+
+
+class BasicTestGenerator(object):
+    test_head_template = '''\
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
+'''
+
+    function_test_template = """\
+class {testname}(unittest.TestCase):
+
+    def _call(self, *args, **kw):
+        from ..{relmodule} import {name}
+        return {name}(*args, **kw)
+
+"""
+
+    class_test_template = """\
+class {testname}(unittest.TestCase):
+
+    @property
+    def _class(self):
+        from ..{relmodule} import {name}
+        return {name}
+
+    def _make(self):
+        return self._class()
+
+"""
+
+    def make_test_head(self, template_vars):
+        return self.test_head_template.format(**template_vars)
+
+    def make_function_test(self, template_vars):
+        return self.function_test_template.format(**template_vars)
+
+    def make_class_test(self, template_vars):
+        return self.class_test_template.format(**template_vars)

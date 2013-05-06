@@ -1,7 +1,7 @@
 
 """Quick and dirty extraction of 'def' and 'class' statements from Python code.
 
-Uses trivial regular expressions. Works even in the face of syntax errors. :-)
+Uses trivial regular expressions. Works even when there are syntax errors. :-)
 """
 
 import re
@@ -121,7 +121,7 @@ def test_list_decls():
                "  pass\n"
                " class bar():\n"
                "  def baz():\n"
-               "   pass\n"
+               "   x = 1\n"
                " # hi!\n"
                "  stop = True\n"
                "class Y: pass\n"
