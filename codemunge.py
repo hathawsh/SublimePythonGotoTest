@@ -1,7 +1,8 @@
 
 """Quick and dirty extraction of 'def' and 'class' statements from Python code.
 
-Uses trivial regular expressions. Works even when there are syntax errors. :-)
+Uses trivial regular expressions. Unlike the ast module, this works even
+when there are syntax errors. :-)
 """
 
 import re

@@ -1,4 +1,4 @@
 [
-    { "keys": ["super+t"], "command": "goto_test"},
-    { "keys": ["shift+super+t"], "command": "generate_test"}
+    { "keys": ["ctrl+alt+t"], "command": "goto_test"},
+    { "keys": ["shift+ctrl+alt+t"], "command": "generate_test"}
 ]

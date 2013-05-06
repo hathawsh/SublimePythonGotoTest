@@ -1,0 +1,10 @@
+[
+    {
+        "caption": "PythonGotoTest: Go to test or vice-versa",
+        "command": "goto_test"
+    },
+    {
+        "caption": "PythonGotoTest: Generate test",
+        "command": "generate_test"
+    }
+]

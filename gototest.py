@@ -9,19 +9,21 @@ _deferred = {}  # {filename: CodeNav}
 
 
 class GotoTestCommand(sublime_plugin.TextCommand):
+    """Go to the unit test for this Python code or vice-versa"""
+
     generate = False
 
     def run(self, edit):
         view = self.view
         fname = view.file_name()
         if not fname:
-            sublime.status_message("toggle_test: No file name given.")
+            sublime.status_message("PythonGotoTest: No file name given.")
             return
 
         dirname, basename = os.path.split(fname)
         name, ext = os.path.splitext(basename)
         if ext != '.py':
-            sublime.status_message("toggle_test: for .py files only.")
+            sublime.status_message("PythonGotoTest: for .py files only.")
             return
 
         content = view.substr(sublime.Region(0, view.size()))
@@ -30,13 +32,13 @@ class GotoTestCommand(sublime_plugin.TextCommand):
 
         if os.path.basename(dirname) == 'tests':
             if basename.startswith('test_'):
-                # The file is a test. Go to the main code.
+                # The file is test code. Go to the main code.
                 parent = os.path.dirname(dirname)
                 target = os.path.join(parent, basename[5:])
                 nav = MainCodeNavigator(target, content, row)
             else:
-                sublime.status_message("toggle_test: {0} is not a test module."
-                                       .format(fname))
+                sublime.status_message("PythonGotoTest: {0} is "
+                                       "not a test module.".format(fname))
                 return
         else:
             # The file is the main code. Go to the test code.
@@ -65,6 +67,7 @@ class GotoTestCommand(sublime_plugin.TextCommand):
 
 
 class GenerateTestCommand(GotoTestCommand):
+    """Generate a stub unit test for this Python code"""
     generate = True
 
 
@@ -102,16 +105,18 @@ def to_main_name(name):
         return None
 
 
-def show_row(view, row):
-    """Position the cursor on a row in a view."""
-    point = view.text_point(row, 0)
-    line = view.substr(view.line(point))
+def show_rows(view, first_row, last_row):
+    """Position the cursor within a range of rows in a view."""
+    first_point = view.text_point(first_row, 0)
+    last_point = view.text_point(last_row, 0)
+    line = view.substr(view.line(first_point))
     match = re.match(r'\s+', line)
     if match is not None:
-        point += len(match.group(0))
+        # Skip the indentation.
+        first_point += len(match.group(0))
     view.sel().clear()
-    view.sel().add(sublime.Region(point))
-    view.show(point)
+    view.sel().add(sublime.Region(first_point, last_point))
+    view.show(first_point)
 
 
 def insert_rows(view, row, content, margin=2):
@@ -120,7 +125,7 @@ def insert_rows(view, row, content, margin=2):
     if margin:
         if row > 0:
             # Add blank lines before.
-            region = sublime.Region(max(0, point - margin), point)
+            region = sublime.Region(max(0, point - margin - 1), point)
             text_before = view.substr(region)
             blanks = 0
             for c in reversed(text_before):
@@ -128,8 +133,8 @@ def insert_rows(view, row, content, margin=2):
                     blanks += 1
                 else:
                     break
-            if blanks < margin:
-                content = '\n' * (margin - blanks) + content
+            if blanks < margin + 1:
+                content = '\n' * (margin + 1 - blanks) + content
 
         if point < view.size() - 1:
             # Add blank lines after.
@@ -150,7 +155,7 @@ def insert_rows(view, row, content, margin=2):
     view.sel().clear()
     region = sublime.Region(point, point + len(content))
     view.sel().add(region)
-    view.show(region)
+    view.show(sublime.Region(point, point))
 
 
 class CodeNavigator(object):
@@ -165,36 +170,66 @@ class CodeNavigator(object):
             relmodule = ''
         self.template_vars = {'relmodule': relmodule}
 
-    def traverse_top(self, target_view, top_source_name, convert_name):
-        """Get the row in the target view that correlates with a source name.
+    def traverse(self,
+                 target_view,
+                 source_name,
+                 convert_name,
+                 source_decls=None,
+                 target_decls=None,
+                 parent_target_decl=None):
+        """Get the rows in the target view that correlate with a source name.
 
-        Returns (target_decl or None, row). When not found, 'row'
-        indicates where the declaration should exist.
+        If source_decls and target_decls are not given, traverse the top-level
+        names.
+
+        Returns (target_decl or None, first_row, last_row). When not found,
+        'first_row' indicates where the declaration should exist.
         """
-        target_decls = list_view_decls(target_view)
+        if source_decls is None:
+            source_decls = self.source_decls
+        if target_decls is None:
+            target_decls = list_view_decls(target_view)
+
+        target_name = convert_name(source_name)
         target_decl_map = dict((decl.name, decl) for decl in target_decls)
-        target_name = convert_name(top_source_name)
         target_decl = target_decl_map.get(target_name)
         if target_decl is not None:
-            return target_decl, target_decl.first_row + 1
+            return target_decl, target_decl.first_row, target_decl.last_row
 
         # The target code does not exist.
         # Figure out where the new code belongs in the file.
-        row = 0
-        for decl in self.source_decls:
-            if decl.name == top_source_name:
-                # Ignore the rest of the source declarations.
-                break
+        max_row = 0
+        min_row = None
+        after = False
+        for decl in source_decls:
+            if decl.name == source_name:
+                after = True
+                continue
             target_decl = target_decl_map.get(convert_name(decl.name))
             if target_decl is not None:
-                # The new code belongs after this code.
-                row = max(row, target_decl.last_row + 1)
+                if after:
+                    # The new code belongs before this code.
+                    if min_row is None:
+                        min_row = target_decl.first_row - 1
+                    else:
+                        min_row = min(min_row, target_decl.first_row - 1)
+                else:
+                    # The new code belongs after this code.
+                    max_row = max(max_row, target_decl.last_row + 1)
 
-        if not row:
-            # Add the new code to the end.
-            row, _col = target_view.rowcol(target_view.size())
+        if max_row:
+            row = max_row
+        elif min_row is not None:
+            row = min_row
+        else:
+            if parent_target_decl is not None:
+                # Add the new code to the end of the parent.
+                row = parent_target_decl.last_row
+            else:
+                # Add the new code to the end of the file.
+                row, _col = target_view.rowcol(target_view.size())
 
-        return None, row
+        return None, row, row
 
 
 class TestCodeNavigator(CodeNavigator):
@@ -228,65 +263,71 @@ class TestCodeNavigator(CodeNavigator):
             self.goto_func(target_view, decls[0])
 
     def goto_class(self, target_view, class_decl):
-        sublime.status_message("toggle_test: goto_class {0}"
+        sublime.status_message("PythonGotoTest: goto_class {0}"
                                .format(class_decl.name))
 
-        target_decl, row = self.traverse_top(target_view,
-                                             class_decl.name,
-                                             to_test_class_name)
+        target_decl, f_row, l_row = self.traverse(target_view,
+                                                  class_decl.name,
+                                                  to_test_class_name)
 
         if target_decl is None and self.generate:
             content = self.testgen.make_class_test(self.template_vars)
-            insert_rows(target_view, row, content)
+            insert_rows(target_view, f_row, content)
         else:
-            show_row(target_view, row)
+            show_rows(target_view, f_row, l_row)
 
     def goto_func(self, target_view, func_decl):
-        sublime.status_message("toggle_test: goto_func {0}"
+        sublime.status_message("PythonGotoTest: goto_func {0}"
                                .format(func_decl.name))
 
-        target_decl, row = self.traverse_top(target_view,
-                                             func_decl.name,
-                                             to_test_class_name)
+        target_decl, f_row, l_row = self.traverse(target_view,
+                                                  func_decl.name,
+                                                  to_test_class_name)
 
         if target_decl is None and self.generate:
             content = self.testgen.make_function_test(self.template_vars)
-            insert_rows(target_view, row, content)
+            insert_rows(target_view, f_row, content)
         else:
-            show_row(target_view, row)
+            show_rows(target_view, f_row, l_row)
 
     def goto_method(self, target_view, class_decl, method_decl):
-        sublime.status_message("toggle_test: goto_method {0}.{1}"
+        sublime.status_message("PythonGotoTest: goto_method {0}.{1}"
                                .format(class_decl.name, method_decl.name))
 
-        target_class_decl, row = self.traverse_top(target_view,
-                                                   class_decl.name,
-                                                   to_test_class_name)
+        target_class_decl, f_row, l_row = self.traverse(target_view,
+                                                        class_decl.name,
+                                                        to_test_class_name)
 
         if target_class_decl is None and self.generate:
             content = self.testgen.make_class_test(self.template_vars)
-            insert_rows(target_view, row, content)
+            insert_rows(target_view, f_row, content)
 
             # Re-read the declarations.
-            target_class_decl, row = self.traverse_top(target_view,
-                                                       class_decl.name,
-                                                       to_test_class_name)
+            tup = self.traverse(target_view,
+                                class_decl.name,
+                                to_test_class_name)
+            target_class_decl, f_row, l_row = tup
 
         if target_class_decl is not None:
-            tup = self.traverse_method(target_class_decl.children,
-                                       method_decl.name,
-                                       to_test_method_name)
-            target_method_decl, row, found = tup
+            tup = self.traverse(target_view=target_view,
+                                source_name=method_decl.name,
+                                convert_name=to_test_method_name,
+                                source_decls=class_decl.children,
+                                target_decls=target_class_decl.children,
+                                parent_target_decl=target_class_decl)
+            target_method_decl, f_row, l_row = tup
 
             if target_method_decl is None and self.generate:
                 template_vars = {}
                 template_vars.update(template_vars)
+                template_vars['class'] = class_decl.name
                 template_vars['name'] = method_decl.name
                 template_vars['method'] = to_test_method_name(method_decl.name)
                 content = self.testgen.make_method_test(template_vars)
-                insert_rows(target_view, row, content, margin=1)
+                insert_rows(target_view, f_row, content, margin=1)
+                return
 
-        show_row(target_view, row)
+        show_rows(target_view, f_row, l_row)
 
 
 class MainCodeNavigator(CodeNavigator):
@@ -300,7 +341,6 @@ try:
     import unittest2 as unittest
 except ImportError:
     import unittest
-
 '''
 
     function_test_template = """\
@@ -309,7 +349,6 @@ class {testname}(unittest.TestCase):
     def _call(self, *args, **kw):
         from ..{relmodule} import {name}
         return {name}(*args, **kw)
-
 """
 
     class_test_template = """\
@@ -322,8 +361,13 @@ class {testname}(unittest.TestCase):
 
     def _make(self):
         return self._class()
-
 """
+
+    method_test_template = """\
+    @unittest.skip('stub test of {class}.{name}')
+    def {method}(self):
+        pass
+    """
 
     def make_test_head(self, template_vars):
         return self.test_head_template.format(**template_vars)
@@ -333,3 +377,6 @@ class {testname}(unittest.TestCase):
 
     def make_class_test(self, template_vars):
         return self.class_test_template.format(**template_vars)
+
+    def make_method_test(self, template_vars):
+        return self.method_test_template.format(**template_vars)
