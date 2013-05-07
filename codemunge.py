@@ -1,24 +1,13 @@
 
-"""Quick and dirty extraction of 'def' and 'class' statements from Python code.
+"""Use the ast module to parse class and function declarations."""
 
-Uses trivial regular expressions. Unlike the ast module, this works even
-when there are syntax errors. :-)
-"""
-
-import re
+import ast
 import weakref
 
 
-decl_re = re.compile(r'(\s*)(class|def)\s+([A-Za-z_][A-Za-z0-9_]*)')
-other_code_re = re.compile(r'(\s*)(#)?\S')
-tab_replacement = ' ' * 8
-
-
 class Decl(object):
-    """A declaration statement. Usually starts with 'def' or 'class'.
-    """
-    def __init__(self, indent, name, first_row, last_row=None, children=None):
-        self.indent = indent
+    """A function or class declaration statement."""
+    def __init__(self, name, first_row, last_row=None, children=None):
         self.name = name
         self.first_row = first_row
         self.last_row = last_row
@@ -38,9 +27,8 @@ class Decl(object):
         return path
 
     def __repr__(self):
-        return ('{0}({1!r}, {2!r}, {3!r}, {4!r}, {5!r})'
+        return ('{0}({1!r}, {2!r}, {3!r}, {4!r})'
                 .format(self.__class__.__name__,
-                        self.indent,
                         self.name,
                         self.first_row,
                         self.last_row,
@@ -59,50 +47,41 @@ class FuncDecl(Decl):
     pass
 
 
-decl_types = {'class': ClassDecl,
-              'def': FuncDecl}
+class Visitor(ast.NodeVisitor):
+
+    def __init__(self):
+        self.parent = self.top = ModuleDecl('', 0)
+        self.last_lineno = 1
+
+    def visitdecl(self, node, cls):
+        decl = cls(node.name, node.lineno - 1)
+        parent = self.parent
+        decl.parent_ref = weakref.ref(parent)
+        parent.children.append(decl)
+        self.last_lineno = node.lineno
+        self.parent = decl
+        self.generic_visit(node)
+        self.parent = parent
+        decl.last_row = self.last_lineno - 1
+
+    def visit_FunctionDef(self, node):
+        self.visitdecl(node, FuncDecl)
+
+    def visit_ClassDef(self, node):
+        self.visitdecl(node, ClassDecl)
+
+    def generic_visit(self, node):
+        if hasattr(node, 'lineno'):
+            self.last_lineno = max(self.last_lineno, node.lineno)
+        super(Visitor, self).generic_visit(node)
 
 
-def measure_indent(indent_chars):
-    return len(indent_chars.replace('\t', tab_replacement))
-
-
-def list_decls(content):
+def list_decls(content, filename):
     """List the nested declarations in a module."""
-    top = ModuleDecl(-1, '', 0)
-    prev = top
-
-    lines = content.split('\n')
-    for row, line in enumerate(lines):
-        match = decl_re.match(line)
-        if match is not None:
-            indent_chars, decl_type, name = match.groups()
-            indent = measure_indent(indent_chars)
-            decl = decl_types[decl_type](indent, name, row)
-            parent = close_decls(prev, indent, row)
-            decl.parent_ref = weakref.ref(parent)
-            parent.children.append(decl)
-            prev = decl
-
-        else:
-            m = other_code_re.match(line)
-            if m is not None:
-                indent_chars, comment = m.groups()
-                if not comment:
-                    indent = measure_indent(indent_chars)
-                    prev = close_decls(prev, indent, row)
-
-    close_decls(prev, 0, len(lines))
-    return top.children
-
-
-def close_decls(decl, indent, row):
-    """Given a new indentation level, close declarations and return the parent.
-    """
-    while indent <= decl.indent:
-        decl.last_row = row - 1
-        decl = decl.parent_ref()
-    return decl
+    node = ast.parse(content, filename)
+    visitor = Visitor()
+    visitor.visit(node)
+    return visitor.top.children
 
 
 def find_decl_for_row(decls, row):
@@ -120,15 +99,19 @@ def test_list_decls():
     content = ("if 1:\n"
                " def foo():\n"
                "  pass\n"
+               "\n"
                " class bar():\n"
                "  def baz():\n"
-               "   x = 1\n"
+               "   return 1\n"
+               "\n"
                " # hi!\n"
                "  stop = True\n"
                "class Y: pass\n"
                "class Z:\n"
                " pass")
-    decls = list_decls(content)
+    decls = list_decls(content, 'codemunge_test')
+    import pprint
+    pprint.pprint(decls)
     assert len(decls) == 4
     assert decls[0].name == 'foo'
     assert len(decls[0].children) == 0
@@ -137,21 +120,21 @@ def test_list_decls():
 
     assert decls[1].name == 'bar'
     assert len(decls[1].children) == 1
-    assert decls[1].first_row == 3
-    assert decls[1].last_row == 5
+    assert decls[1].first_row == 4
+    assert decls[1].last_row == 9
     assert decls[1].children[0].name == 'baz'
-    assert decls[1].children[0].first_row == 4
-    assert decls[1].children[0].last_row == 5
+    assert decls[1].children[0].first_row == 5
+    assert decls[1].children[0].last_row == 6
 
     assert decls[2].name == 'Y'
     assert len(decls[2].children) == 0
-    assert decls[2].first_row == 8
-    assert decls[2].last_row == 8
+    assert decls[2].first_row == 10
+    assert decls[2].last_row == 10
 
     assert decls[3].name == 'Z'
     assert len(decls[3].children) == 0
-    assert decls[3].first_row == 9
-    assert decls[3].last_row == 10
+    assert decls[3].first_row == 11
+    assert decls[3].last_row == 12
 
 
 if __name__ == '__main__':

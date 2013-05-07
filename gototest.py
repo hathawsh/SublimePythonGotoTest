@@ -1,7 +1,6 @@
 
 import codemunge
 import os
-import re
 import sublime
 import sublime_plugin
 
@@ -35,19 +34,34 @@ class GotoTestCommand(sublime_plugin.TextCommand):
                 # The file is test code. Go to the main code.
                 parent = os.path.dirname(dirname)
                 target = os.path.join(parent, basename[5:])
-                nav = MainCodeNavigator(target, content, row)
+                try:
+                    nav = MainCodeNavigator(target_filename=target,
+                                            source_filename=fname,
+                                            content=content,
+                                            source_row=row)
+                except SyntaxError as e:
+                    show_syntax_error(e)
+                    return
             else:
                 sublime.status_message("PythonGotoTest: {0} is "
                                        "not a test module.".format(fname))
                 return
         else:
             # The file is the main code. Go to the test code.
-            nav = TestCodeNavigator(fname, content, row,
-                                    generate=self.generate)
-
             parent = os.path.join(dirname, 'tests')
             test_fn = 'test_' + basename
             target = os.path.join(parent, test_fn)
+
+            try:
+                nav = TestCodeNavigator(target_filename=target,
+                                        source_filename=fname,
+                                        content=content,
+                                        source_row=row,
+                                        generate=self.generate)
+            except SyntaxError as e:
+                show_syntax_error(e)
+                return
+
             if not os.path.exists(parent):
                 os.mkdir(parent)
 
@@ -80,9 +94,13 @@ class Listener(sublime_plugin.EventListener):
             nav.goto(view)
 
 
+def show_syntax_error(e):
+    sublime.error_message("SyntaxError: {0}".format(e))
+
+
 def list_view_decls(view):
     content = view.substr(sublime.Region(0, view.size()))
-    return codemunge.list_decls(content)
+    return codemunge.list_decls(content, view.file_name())
 
 
 def to_test_class_name(name):
@@ -108,12 +126,7 @@ def to_main_name(name):
 def show_rows(view, first_row, last_row):
     """Position the cursor within a range of rows in a view."""
     first_point = view.text_point(first_row, 0)
-    last_point = view.text_point(last_row, 0)
-    line = view.substr(view.line(first_point))
-    match = re.match(r'\s+', line)
-    if match is not None:
-        # Skip the indentation.
-        first_point += len(match.group(0))
+    last_point = view.text_point(last_row + 1, 0)
     view.sel().clear()
     view.sel().add(sublime.Region(first_point, last_point))
     view.show(first_point)
@@ -159,12 +172,12 @@ def insert_rows(view, row, content, margin=2):
 
 
 class CodeNavigator(object):
-    def __init__(self, filename, content, source_row):
-        self.source_decls = codemunge.list_decls(content)
+    def __init__(self, target_filename, source_filename, content, source_row):
+        self.source_decls = codemunge.list_decls(content, source_filename)
         self.source_decl = codemunge.find_decl_for_row(self.source_decls,
                                                        source_row)
 
-        basename = os.path.basename(filename)
+        basename = os.path.basename(target_filename)
         relmodule, _ext = os.path.splitext(basename)
         if relmodule == '__init__':
             relmodule = ''
@@ -224,7 +237,7 @@ class CodeNavigator(object):
         else:
             if parent_target_decl is not None:
                 # Add the new code to the end of the parent.
-                row = parent_target_decl.last_row
+                row = parent_target_decl.last_row + 1
             else:
                 # Add the new code to the end of the file.
                 row, _col = target_view.rowcol(target_view.size())
@@ -235,8 +248,8 @@ class CodeNavigator(object):
 class TestCodeNavigator(CodeNavigator):
     """Navigate to test code and optionally generate it."""
 
-    def __init__(self, filename, content, row, generate):
-        super(TestCodeNavigator, self).__init__(filename, content, row)
+    def __init__(self, generate, **kw):
+        super(TestCodeNavigator, self).__init__(**kw)
         self.testgen = BasicTestGenerator()
         self.generate = generate
 
@@ -254,13 +267,17 @@ class TestCodeNavigator(CodeNavigator):
             content = self.testgen.make_test_head(self.template_vars)
             insert_rows(target_view, 0, content)
 
-        if isinstance(decls[0], codemunge.ClassDecl):
-            if len(decls) >= 2 and isinstance(decls[1], codemunge.FuncDecl):
-                self.goto_method(target_view, decls[0], decls[1])
-            else:
-                self.goto_class(target_view, decls[0])
-        elif isinstance(decls[0], codemunge.FuncDecl):
-            self.goto_func(target_view, decls[0])
+        try:
+            if isinstance(decls[0], codemunge.ClassDecl):
+                if len(decls) >= 2 and isinstance(decls[1], codemunge.FuncDecl):
+                    self.goto_method(target_view, decls[0], decls[1])
+                else:
+                    self.goto_class(target_view, decls[0])
+            elif isinstance(decls[0], codemunge.FuncDecl):
+                self.goto_func(target_view, decls[0])
+        except SyntaxError as e:
+            show_syntax_error(e)
+            return
 
     def goto_class(self, target_view, class_decl):
         sublime.status_message("PythonGotoTest: goto_class {0}"
@@ -286,7 +303,7 @@ class TestCodeNavigator(CodeNavigator):
 
         if target_decl is None and self.generate:
             content = self.testgen.make_function_test(self.template_vars)
-            insert_rows(target_view, f_row, content)
+            insert_rows(target_view, f_row + 1, content)
         else:
             show_rows(target_view, f_row, l_row)
 
@@ -364,10 +381,10 @@ class {testname}(unittest.TestCase):
 """
 
     method_test_template = """\
-    @unittest.skip('stub test of {class}.{name}')
+    @unittest.skip('stub test of method {name}')
     def {method}(self):
         pass
-    """
+"""
 
     def make_test_head(self, template_vars):
         return self.test_head_template.format(**template_vars)
