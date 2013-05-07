@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertEqual(len($1), $2)]]></content>
+    <tabTrigger>ael</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertEqual(len())</description>
+</snippet>

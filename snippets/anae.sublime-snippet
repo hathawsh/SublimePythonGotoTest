@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertNotAlmostEqual($1, $2)]]></content>
+    <tabTrigger>anae</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertNotAlmostEqual</description>
+</snippet>

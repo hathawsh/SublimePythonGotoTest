@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertLessEqual($1, $2)]]></content>
+    <tabTrigger>ale</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertLessEqual</description>
+</snippet>

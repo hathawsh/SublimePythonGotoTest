@@ -1,0 +1,8 @@
+<snippet>
+    <content>
+<![CDATA[with self.assertRaisesRegexp($1, r'$2'):
+    ]]></content>
+    <tabTrigger>arr</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertRaisesRegexp</description>
+</snippet>

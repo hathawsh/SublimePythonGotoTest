@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertNotEqual($1, $2)]]></content>
+    <tabTrigger>ane</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertNotEqual</description>
+</snippet>

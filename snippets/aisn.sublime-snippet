@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertIsNot($1, $2)]]></content>
+    <tabTrigger>aisn</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertIsNot</description>
+</snippet>

@@ -1,0 +1,6 @@
+<snippet>
+    <content><![CDATA[self.assertIs($1, $2)]]></content>
+    <tabTrigger>ais</tabTrigger>
+    <scope>source.python</scope>
+    <description>assertIs</description>
+</snippet>
