@@ -126,9 +126,9 @@ def to_main_name(name):
 def show_rows(view, first_row, last_row):
     """Position the cursor within a range of rows in a view."""
     first_point = view.text_point(first_row, 0)
-    last_point = view.text_point(last_row + 1, 0)
+    # last_point = view.text_point(last_row + 1, 0)
     view.sel().clear()
-    view.sel().add(sublime.Region(first_point, last_point))
+    view.sel().add(sublime.Region(first_point))
     view.show(first_point)
 
 
@@ -189,7 +189,8 @@ class CodeNavigator(object):
                  convert_name,
                  source_decls=None,
                  target_decls=None,
-                 parent_target_decl=None):
+                 parent_target_decl=None,
+                 match_mode='exact'):
         """Get the rows in the target view that correlate with a source name.
 
         If source_decls and target_decls are not given, traverse the top-level
@@ -205,12 +206,13 @@ class CodeNavigator(object):
 
         target_name = convert_name(source_name)
         target_decl_map = dict((decl.name, decl) for decl in target_decls)
-        target_decl = target_decl_map.get(target_name)
-        if target_decl is not None:
+        matches = self.filter_targets(target_decl_map, target_name, match_mode)
+        if matches:
+            target_decl = matches[0]
             return target_decl, target_decl.first_row, target_decl.last_row
 
         # The target code does not exist.
-        # Figure out where the new code belongs in the file.
+        # Figure out where the new code belongs in the target file.
         max_row = 0
         min_row = None
         after = False
@@ -218,8 +220,11 @@ class CodeNavigator(object):
             if decl.name == source_name:
                 after = True
                 continue
-            target_decl = target_decl_map.get(convert_name(decl.name))
-            if target_decl is not None:
+
+            matches = self.filter_targets(target_decl_map,
+                                          convert_name(decl.name),
+                                          match_mode)
+            for target_decl in matches:
                 if after:
                     # The new code belongs before this code.
                     if min_row is None:
@@ -243,6 +248,28 @@ class CodeNavigator(object):
                 row, _col = target_view.rowcol(target_view.size())
 
         return None, row, row
+
+    def filter_targets(self, decl_map, name, mode='exact'):
+        """List the target decls that correspond with a source decl."""
+        if mode == 'exact':
+            decl = decl_map.get(name)
+            if decl is not None:
+                return [decl]
+            else:
+                return ()
+
+        elif mode == 'prefix_under':
+            prefix = name + '_'
+            matches = []
+            items = decl_map.items()
+            items.sort()
+            for key, decl in items:
+                if key == name or key.startswith(prefix):
+                    matches.append(decl)
+            return matches
+
+        else:
+            raise ValueError("Unknown match mode: {0}".format(mode))
 
 
 class TestCodeNavigator(CodeNavigator):
@@ -331,7 +358,8 @@ class TestCodeNavigator(CodeNavigator):
                                 convert_name=to_test_method_name,
                                 source_decls=class_decl.children,
                                 target_decls=target_class_decl.children,
-                                parent_target_decl=target_class_decl)
+                                parent_target_decl=target_class_decl,
+                                match_mode='prefix_under')
             target_method_decl, f_row, l_row = tup
 
             if target_method_decl is None and self.generate:
