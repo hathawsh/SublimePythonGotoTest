@@ -179,7 +179,7 @@ class CodeNavigator(object):
         self.source_decl = codemunge.find_decl_for_row(self.source_decls,
                                                        source_row)
 
-        basename = os.path.basename(target_filename)
+        basename = os.path.basename(source_filename)
         relmodule, _ext = os.path.splitext(basename)
         if relmodule == '__init__':
             relmodule = ''
