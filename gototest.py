@@ -111,6 +111,8 @@ def to_test_class_name(name):
 
 
 def to_test_method_name(name):
+    if name == '__init__':
+        name = 'ctor'
     return 'test_{0}'.format(name)
 
 
