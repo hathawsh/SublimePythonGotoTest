@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertFalse($1)]]></content>
     <tabTrigger>af</tabTrigger>
     <scope>source.python</scope>
-    <description>assertFalse</description>
+    <description>.assertFalse</description>
 </snippet>

@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertIsNotNone($1)]]></content>
     <tabTrigger>anno</tabTrigger>
     <scope>source.python</scope>
-    <description>assertIsNotNone</description>
+    <description>.assertIsNotNone</description>
 </snippet>

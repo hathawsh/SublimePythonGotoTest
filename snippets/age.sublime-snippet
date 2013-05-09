@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertGreaterEqual($1, $2)]]></content>
     <tabTrigger>age</tabTrigger>
     <scope>source.python</scope>
-    <description>assertGreaterEqual</description>
+    <description>.assertGreaterEqual</description>
 </snippet>

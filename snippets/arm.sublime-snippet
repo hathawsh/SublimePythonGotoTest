@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertRegexpMatches($1, r'$2')]]></content>
     <tabTrigger>arm</tabTrigger>
     <scope>source.python</scope>
-    <description>assertRegexpMatches</description>
+    <description>.assertRegexpMatches</description>
 </snippet>

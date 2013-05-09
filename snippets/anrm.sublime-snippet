@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertNotRegexpMatches($1, r'$2')]]></content>
     <tabTrigger>anrm</tabTrigger>
     <scope>source.python</scope>
-    <description>assertNotRegexpMatches</description>
+    <description>.assertNotRegexpMatches</description>
 </snippet>

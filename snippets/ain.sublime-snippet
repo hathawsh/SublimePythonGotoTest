@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertIn($1, $2)]]></content>
     <tabTrigger>ain</tabTrigger>
     <scope>source.python</scope>
-    <description>assertIn</description>
+    <description>.assertIn</description>
 </snippet>

@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertNotIn($1, $2)]]></content>
     <tabTrigger>anin</tabTrigger>
     <scope>source.python</scope>
-    <description>assertNotIn</description>
+    <description>.assertNotIn</description>
 </snippet>

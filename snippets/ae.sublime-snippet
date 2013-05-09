@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertEqual($1, $2)]]></content>
     <tabTrigger>ae</tabTrigger>
     <scope>source.python</scope>
-    <description>assertEqual</description>
+    <description>.assertEqual</description>
 </snippet>

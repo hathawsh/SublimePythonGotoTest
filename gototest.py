@@ -283,6 +283,9 @@ class TestCodeNavigator(CodeNavigator):
         self.generate = generate
 
     def goto(self, target_view):
+        if self.source_decl is None:
+            return
+
         decls = self.source_decl.get_path()
         if not decls:
             # No particular declaration was specified.

@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertTrue($1)]]></content>
     <tabTrigger>at</tabTrigger>
     <scope>source.python</scope>
-    <description>assertTrue</description>
+    <description>.assertTrue</description>
 </snippet>

@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertAlmostEqual($1, $2)]]></content>
     <tabTrigger>aae</tabTrigger>
     <scope>source.python</scope>
-    <description>assertAlmostEqual</description>
+    <description>.assertAlmostEqual</description>
 </snippet>

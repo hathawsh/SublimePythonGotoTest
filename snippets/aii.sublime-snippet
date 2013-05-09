@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertIsInstance(${1:obj}, ${2:type})]]></content>
     <tabTrigger>aii</tabTrigger>
     <scope>source.python</scope>
-    <description>assertIsInstance</description>
+    <description>.assertIsInstance</description>
 </snippet>

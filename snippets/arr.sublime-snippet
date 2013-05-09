@@ -4,5 +4,5 @@
     ]]></content>
     <tabTrigger>arr</tabTrigger>
     <scope>source.python</scope>
-    <description>assertRaisesRegexp</description>
+    <description>.assertRaisesRegexp</description>
 </snippet>

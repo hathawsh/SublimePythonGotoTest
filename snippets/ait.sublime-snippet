@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertItemsEqual(${1:actual}, ${2:expected})]]></content>
     <tabTrigger>ait</tabTrigger>
     <scope>source.python</scope>
-    <description>assertItemsEqual</description>
+    <description>.assertItemsEqual</description>
 </snippet>

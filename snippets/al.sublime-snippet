@@ -2,5 +2,5 @@
     <content><![CDATA[self.assertLess($1, $2)]]></content>
     <tabTrigger>al</tabTrigger>
     <scope>source.python</scope>
-    <description>assertLess</description>
+    <description>.assertLess</description>
 </snippet>
