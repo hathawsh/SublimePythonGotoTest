@@ -16,13 +16,15 @@ class GotoTestCommand(sublime_plugin.TextCommand):
         view = self.view
         fname = view.file_name()
         if not fname:
-            sublime.status_message("PythonGotoTest: No file name given.")
+            sublime.status_message("SublimePythonGotoTest: "
+                                   "No file name given.")
             return
 
         dirname, basename = os.path.split(fname)
         name, ext = os.path.splitext(basename)
         if ext != '.py':
-            sublime.status_message("PythonGotoTest: for .py files only.")
+            sublime.status_message("SublimePythonGotoTest: "
+                                   "for .py files only.")
             return
 
         content = view.substr(sublime.Region(0, view.size()))
@@ -43,8 +45,9 @@ class GotoTestCommand(sublime_plugin.TextCommand):
                     show_syntax_error(e)
                     return
             else:
-                sublime.status_message("PythonGotoTest: {0} is "
-                                       "not a test module.".format(fname))
+                sublime.status_message("SublimePythonGotoTest: "
+                                       "{0} is not a test module."
+                                       .format(fname))
                 return
         else:
             # The file is the main code. Go to the test code.
@@ -312,8 +315,8 @@ class TestCodeNavigator(CodeNavigator):
             return
 
     def goto_class(self, target_view, class_decl):
-        sublime.status_message("PythonGotoTest: goto_class {0}"
-                               .format(class_decl.name))
+        sublime.status_message("SublimePythonGotoTest: "
+                               "goto_class {0}".format(class_decl.name))
 
         target_decl, f_row, l_row = self.traverse(target_view,
                                                   class_decl.name,
@@ -326,8 +329,8 @@ class TestCodeNavigator(CodeNavigator):
             show_rows(target_view, f_row, l_row)
 
     def goto_func(self, target_view, func_decl):
-        sublime.status_message("PythonGotoTest: goto_func {0}"
-                               .format(func_decl.name))
+        sublime.status_message("SublimePythonGotoTest: "
+                               "goto_func {0}".format(func_decl.name))
 
         target_decl, f_row, l_row = self.traverse(target_view,
                                                   func_decl.name,
@@ -340,8 +343,9 @@ class TestCodeNavigator(CodeNavigator):
             show_rows(target_view, f_row, l_row)
 
     def goto_method(self, target_view, class_decl, method_decl):
-        sublime.status_message("PythonGotoTest: goto_method {0}.{1}"
-                               .format(class_decl.name, method_decl.name))
+        sublime.status_message("SublimePythonGotoTest: "
+                               "goto_method {0}.{1}".format(class_decl.name,
+                                                            method_decl.name))
 
         target_class_decl, f_row, l_row = self.traverse(target_view,
                                                         class_decl.name,

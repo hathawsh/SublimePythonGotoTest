@@ -10,6 +10,7 @@ class Decl(object):
     def __init__(self, name, first_row, last_row=None, children=None):
         self.name = name
         self.first_row = first_row
+        # Note: last_row includes the blank rows after the declaration.
         self.last_row = last_row
         self.children = children or []
         self.parent_ref = None  # A weakref.ref
@@ -52,6 +53,7 @@ class Visitor(ast.NodeVisitor):
     def __init__(self):
         self.parent = self.top = ModuleDecl('', 0)
         self.last_lineno = 1
+        self.closing_decls = []
 
     def visitdecl(self, node, cls):
         decl = cls(node.name, node.lineno - 1)
@@ -63,17 +65,35 @@ class Visitor(ast.NodeVisitor):
         self.generic_visit(node)
         self.parent = parent
         decl.last_row = self.last_lineno - 1
+        self.closing_decls.append(decl)
 
     def visit_FunctionDef(self, node):
+        self.close_decls(node.lineno)
         self.visitdecl(node, FuncDecl)
 
     def visit_ClassDef(self, node):
+        self.close_decls(node.lineno)
         self.visitdecl(node, ClassDecl)
 
     def generic_visit(self, node):
         if hasattr(node, 'lineno'):
+            self.close_decls(node.lineno)
             self.last_lineno = max(self.last_lineno, node.lineno)
         super(Visitor, self).generic_visit(node)
+
+    def close_decls(self, new_lineno):
+        decls = self.closing_decls
+        if decls:
+            # Extend the range of the closing declarations to include
+            # multi-line expressions and blank lines.
+            # To compute last_row, subtract 1 because the previous
+            # declaration ends on the line before;
+            # subtract 1 again because rows are zero-based while lines are
+            # one-based.
+            last_row = new_lineno - 2
+            for decl in decls:
+                decl.last_row = max(last_row, decl.last_row)
+            del self.closing_decls[:]
 
 
 def list_decls(content, filename):
@@ -81,6 +101,9 @@ def list_decls(content, filename):
     node = ast.parse(content, filename)
     visitor = Visitor()
     visitor.visit(node)
+    if visitor.closing_decls:
+        lines = len(content.splitlines())
+        visitor.close_decls(lines + 1)
     return visitor.top.children
 
 
@@ -96,19 +119,24 @@ def find_decl_for_row(decls, row):
 
 
 def test_list_decls():
-    content = ("if 1:\n"
-               " def foo():\n"
-               "  pass\n"
-               "\n"
-               " class bar():\n"
-               "  def baz():\n"
-               "   return 1\n"
-               "\n"
-               " # hi!\n"
-               "  stop = True\n"
-               "class Y: pass\n"
-               "class Z:\n"
-               " pass")
+    content = ("if 1:\n"          # row 0
+               " def foo():\n"    # row 1
+               "  pass\n"         # row 2
+               "\n"               # row 3
+               "\n"               # row 4
+               " class bar():\n"  # row 5
+               "  def baz():\n"   # row 6
+               "   def zed():\n"  # row 7
+               "    return [\n"   # row 8
+               "     1]\n"        # row 9
+               "\n"               # row 10
+               " # hi!\n"         # row 11
+               "  stop = True\n"  # row 12
+               "class Y: pass\n"  # row 13
+               "class Z:\n"       # row 14
+               " '''stuff\n"      # row 15
+               "... more '''\n"   # row 16
+               "\n")              # row 17
     decls = list_decls(content, 'codemunge_test')
     import pprint
     pprint.pprint(decls)
@@ -116,25 +144,29 @@ def test_list_decls():
     assert decls[0].name == 'foo'
     assert len(decls[0].children) == 0
     assert decls[0].first_row == 1
-    assert decls[0].last_row == 2
+    assert decls[0].last_row == 4
 
     assert decls[1].name == 'bar'
     assert len(decls[1].children) == 1
-    assert decls[1].first_row == 4
-    assert decls[1].last_row == 9
+    assert decls[1].first_row == 5
+    assert decls[1].last_row == 12
     assert decls[1].children[0].name == 'baz'
-    assert decls[1].children[0].first_row == 5
-    assert decls[1].children[0].last_row == 6
+    assert decls[1].children[0].first_row == 6
+    assert decls[1].children[0].last_row == 11
+    assert len(decls[1].children[0].children) == 1
+    assert decls[1].children[0].children[0].name == 'zed'
+    assert decls[1].children[0].children[0].first_row == 7
+    assert decls[1].children[0].children[0].last_row == 11
 
     assert decls[2].name == 'Y'
     assert len(decls[2].children) == 0
-    assert decls[2].first_row == 10
-    assert decls[2].last_row == 10
+    assert decls[2].first_row == 13
+    assert decls[2].last_row == 13
 
     assert decls[3].name == 'Z'
     assert len(decls[3].children) == 0
-    assert decls[3].first_row == 11
-    assert decls[3].last_row == 12
+    assert decls[3].first_row == 14
+    assert decls[3].last_row == 17
 
 
 if __name__ == '__main__':
