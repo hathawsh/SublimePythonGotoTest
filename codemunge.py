@@ -2,7 +2,10 @@
 """Use the ast module to parse class and function declarations."""
 
 import ast
+import re
 import weakref
+
+empty_line_re = re.compile(r'\s*$')
 
 
 class Decl(object):
@@ -50,8 +53,9 @@ class FuncDecl(Decl):
 
 class Visitor(ast.NodeVisitor):
 
-    def __init__(self):
+    def __init__(self, lines):
         self.parent = self.top = ModuleDecl('', 0)
+        self.lines = lines
         self.last_lineno = 1
         self.closing_decls = []
 
@@ -84,13 +88,20 @@ class Visitor(ast.NodeVisitor):
     def close_decls(self, new_lineno):
         decls = self.closing_decls
         if decls:
-            # Extend the range of the closing declarations to include
-            # multi-line expressions and blank lines.
+            # Change the range of the closing declarations to include
+            # multi-line expressions, but not blank lines.
             # To compute last_row, subtract 1 because the previous
             # declaration ends on the line before;
             # subtract 1 again because rows are zero-based while lines are
             # one-based.
             last_row = new_lineno - 2
+            while last_row > 0 and last_row < len(self.lines):
+                line = self.lines[last_row]
+                if not line or empty_line_re.match(line):
+                    # Ignore an empty line.
+                    last_row -= 1
+                else:
+                    break
             for decl in decls:
                 decl.last_row = max(last_row, decl.last_row)
             del self.closing_decls[:]
@@ -99,11 +110,11 @@ class Visitor(ast.NodeVisitor):
 def list_decls(content, filename):
     """List the nested declarations in a module."""
     node = ast.parse(content, filename)
-    visitor = Visitor()
+    lines = content.splitlines()
+    visitor = Visitor(lines)
     visitor.visit(node)
     if visitor.closing_decls:
-        lines = len(content.splitlines())
-        visitor.close_decls(lines + 1)
+        visitor.close_decls(len(lines) + 1)
     return visitor.top.children
 
 
@@ -141,10 +152,11 @@ def test_list_decls():
     import pprint
     pprint.pprint(decls)
     assert len(decls) == 4
+
     assert decls[0].name == 'foo'
     assert len(decls[0].children) == 0
     assert decls[0].first_row == 1
-    assert decls[0].last_row == 4
+    assert decls[0].last_row == 2
 
     assert decls[1].name == 'bar'
     assert len(decls[1].children) == 1
@@ -166,7 +178,7 @@ def test_list_decls():
     assert decls[3].name == 'Z'
     assert len(decls[3].children) == 0
     assert decls[3].first_row == 14
-    assert decls[3].last_row == 17
+    assert decls[3].last_row == 16
 
 
 if __name__ == '__main__':
