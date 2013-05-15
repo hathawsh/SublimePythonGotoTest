@@ -35,7 +35,12 @@ class GotoTestCommand(sublime_plugin.TextCommand):
             if basename.startswith('test_'):
                 # The file is test code. Go to the main code.
                 parent = os.path.dirname(dirname)
-                target = os.path.join(parent, basename[5:])
+                main_name = basename[5:]
+                if main_name == os.path.basename(parent) + '.py':
+                    if not os.path.exists(os.path.join(parent, main_name)):
+                        # This is a test of the package's __init__.py.
+                        main_name = '__init__.py'
+                target = os.path.join(parent, main_name)
                 try:
                     nav = MainCodeNavigator(target_filename=target,
                                             source_filename=fname,
@@ -52,7 +57,14 @@ class GotoTestCommand(sublime_plugin.TextCommand):
         else:
             # The file is the main code. Go to the test code.
             parent = os.path.join(dirname, 'tests')
-            test_fn = 'test_' + basename
+            main_name = basename
+            if main_name == '__init__.py':
+                package_name = os.path.basename(dirname)
+                if not os.path.exists(os.path.join(dirname,
+                                      package_name + '.py')):
+                    # Make a test of the package's __init__.py.
+                    main_name = package_name + '.py'
+            test_fn = 'test_' + main_name
             target = os.path.join(parent, test_fn)
 
             try:
