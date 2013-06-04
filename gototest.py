@@ -7,8 +7,8 @@ import sublime_plugin
 import weakref
 
 empty_line_re = re.compile(r'\s*$')
-
-_deferred = {}  # {filename: CodeNav}
+_deferred = {}  # {filename: CodeNavigator}
+here = os.path.abspath(os.path.dirname(__file__))
 
 
 class Decl(object):
@@ -55,6 +55,7 @@ class FuncDecl(Decl):
 
 
 class Visitor(ast.NodeVisitor):
+    """Create a Decl tree from a Python abstract syntax tree."""
 
     def __init__(self, lines):
         self.parent = self.top = ModuleDecl('', 0)
@@ -93,8 +94,8 @@ class Visitor(ast.NodeVisitor):
         if decls:
             # Change the range of the closing declarations to include
             # multi-line expressions, but not blank lines.
-            # To compute last_row, subtract 1 because the previous
-            # declaration ends on the line before;
+            # To compute last_row, subtract 1 from new_lineono because
+            # the previous declaration ends on the line before;
             # subtract 1 again because rows are zero-based while lines are
             # one-based.
             last_row = new_lineno - 2
@@ -226,6 +227,7 @@ class GenerateTestCommand(GotoTestCommand):
 
 
 class Listener(sublime_plugin.EventListener):
+    """Finish test generation right after a test module has been opened."""
     def on_load(self, view):
         fn = os.path.abspath(view.file_name())
         nav = _deferred.get(fn)
@@ -244,7 +246,7 @@ def list_view_decls(view):
 
 
 def to_test_class_name(name):
-    if name[:1].upper() == name[:1]:
+    if name[:1].isupper():
         return 'Test{0}'.format(name)
     else:
         return 'Test_{0}'.format(name)
@@ -253,6 +255,8 @@ def to_test_class_name(name):
 def to_test_method_name(name):
     if name == '__init__':
         name = 'ctor'
+    elif name == '__call__':
+        name = 'call'
     return 'test_{0}'.format(name)
 
 
@@ -314,7 +318,9 @@ def insert_rows(view, row, content, margin=2):
 
 
 class CodeNavigator(object):
+    """Base class for navigating within a particular file."""
     def __init__(self, target_filename, source_filename, content, source_row):
+        self.target_filename = target_filename
         self.source_decls = list_decls(content, source_filename)
         self.source_decl = find_decl_for_row(self.source_decls, source_row)
 
@@ -322,7 +328,9 @@ class CodeNavigator(object):
         relmodule, _ext = os.path.splitext(basename)
         if relmodule == '__init__':
             relmodule = ''
-        self.template_vars = {'relmodule': relmodule}
+        self.template_vars = {'source_filename': source_filename,
+                              'relmodule': relmodule,
+                              'target_filename': target_filename}
 
     def traverse(self,
                  target_view,
@@ -334,6 +342,7 @@ class CodeNavigator(object):
                  match_mode='exact'):
         """Get the rows in the target view that correlate with a source name.
 
+        This can traverse either top-level names or names inside a class.
         If source_decls and target_decls are not given, traverse the top-level
         names.
 
@@ -418,7 +427,7 @@ class TestCodeNavigator(CodeNavigator):
 
     def __init__(self, generate, **kw):
         super(TestCodeNavigator, self).__init__(**kw)
-        self.testgen = BasicTestGenerator()
+        self.testgen = CustomTestGenerator(self.target_filename)
         self.generate = generate
 
     def goto(self, target_view):
@@ -435,7 +444,8 @@ class TestCodeNavigator(CodeNavigator):
         self.template_vars['testname'] = to_test_class_name(name)
 
         if self.generate and not target_view.size():
-            content = self.testgen.make_test_head(self.template_vars)
+            # The test module is empty or doesn't exist, so create it.
+            content = self.testgen.make_test_head(**self.template_vars)
             insert_rows(target_view, 0, content)
 
         try:
@@ -459,7 +469,7 @@ class TestCodeNavigator(CodeNavigator):
                                                   to_test_class_name)
 
         if target_decl is None and self.generate:
-            content = self.testgen.make_class_test(self.template_vars)
+            content = self.testgen.make_class_test(**self.template_vars)
             insert_rows(target_view, f_row, content)
         else:
             show_rows(target_view, f_row, l_row)
@@ -473,7 +483,7 @@ class TestCodeNavigator(CodeNavigator):
                                                   to_test_class_name)
 
         if target_decl is None and self.generate:
-            content = self.testgen.make_function_test(self.template_vars)
+            content = self.testgen.make_function_test(**self.template_vars)
             insert_rows(target_view, f_row + 1, content)
         else:
             show_rows(target_view, f_row, l_row)
@@ -488,7 +498,7 @@ class TestCodeNavigator(CodeNavigator):
                                                         to_test_class_name)
 
         if target_class_decl is None and self.generate:
-            content = self.testgen.make_class_test(self.template_vars)
+            content = self.testgen.make_class_test(**self.template_vars)
             insert_rows(target_view, f_row, content)
 
             # Re-read the declarations.
@@ -509,11 +519,12 @@ class TestCodeNavigator(CodeNavigator):
 
             if target_method_decl is None and self.generate:
                 template_vars = {}
-                template_vars.update(template_vars)
-                template_vars['class'] = class_decl.name
+                template_vars.update(self.template_vars)
                 template_vars['name'] = method_decl.name
-                template_vars['method'] = to_test_method_name(method_decl.name)
-                content = self.testgen.make_method_test(template_vars)
+                template_vars['testname'] = \
+                    to_test_method_name(method_decl.name)
+                template_vars['classname'] = class_decl.name
+                content = self.testgen.make_method_test(**template_vars)
                 insert_rows(target_view, f_row, content, margin=1)
                 return
 
@@ -525,54 +536,45 @@ class MainCodeNavigator(CodeNavigator):
         pass
 
 
-class BasicTestGenerator(object):
-    test_head_template = '''\
-try:
-    import unittest2 as unittest
-except ImportError:
-    import unittest
-'''
+class CustomTestGenerator(object):
+    """Use the lineage of __testgen__.py modules to generate tests."""
 
-    function_test_template = """\
-class {testname}(unittest.TestCase):
+    func_names = ('make_test_head',
+                  'make_function_test',
+                  'make_class_test',
+                  'make_method_test')
 
-    def _call(self, *args, **kw):
-        from ..{relmodule} import {name}
-        return {name}(*args, **kw)
-"""
+    def __init__(self, target_filename):
+        modfiles = []
 
-    class_test_template = """\
-class {testname}(unittest.TestCase):
+        fn = os.path.join(here, '__testgen__.py')
+        modfiles.append(fn)
 
-    @property
-    def _class(self):
-        from ..{relmodule} import {name}
-        return {name}
+        parent = os.path.dirname(target_filename)
+        while parent:
+            fn = os.path.join(parent, '__testgen__.py')
+            if os.path.exists(fn):
+                modfiles.append(fn)
+            next_parent = os.path.dirname(parent)
+            if next_parent == parent:
+                break
+            else:
+                parent = next_parent
 
-    def _make(self):
-        return self._class()
-"""
+        funcs = {}
 
-    method_test_template = """\
-    @unittest.skip('stub test of method {name}')
-    def {method}(self):
-        pass
-"""
+        # Execute the most generic testgen module first so that more
+        # specific modules can override as they see fit.
+        for modfile in modfiles:
+            execfile(modfile, funcs, funcs)
 
-    def make_test_head(self, template_vars):
-        return self.test_head_template.format(**template_vars)
-
-    def make_function_test(self, template_vars):
-        return self.function_test_template.format(**template_vars)
-
-    def make_class_test(self, template_vars):
-        return self.class_test_template.format(**template_vars)
-
-    def make_method_test(self, template_vars):
-        return self.method_test_template.format(**template_vars)
+        # Now add the functions as methods of this object.
+        for func_name in self.func_names:
+            setattr(self, func_name, funcs[func_name])
 
 
 def test_list_decls():
+    # Ensure list_decls doesn't trip over various odd cases.
     content = ("if 1:\n"          # row 0
                " def foo():\n"    # row 1
                "  pass\n"         # row 2

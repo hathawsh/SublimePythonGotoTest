@@ -1,10 +1,10 @@
 [
     {
-        "caption": "PythonGotoTest: Go to test or vice-versa",
+        "caption": "SublimePythonGotoTest: Go to test or vice-versa",
         "command": "goto_test"
     },
     {
-        "caption": "PythonGotoTest: Generate test",
+        "caption": "SublimePythonGotoTest: Generate test",
         "command": "generate_test"
     }
 ]
