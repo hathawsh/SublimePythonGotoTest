@@ -33,6 +33,8 @@ calls these functions:
 
 Note that this module is executed by Sublime Text's internal Python
 interpreter, so you should not try to import from your code in __testgen__.py.
+Also, avoid reading directly from source_filename since the file contents
+may be out of sync with the current Sublime Text buffer.
 """
 
 
