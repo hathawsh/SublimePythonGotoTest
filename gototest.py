@@ -245,21 +245,6 @@ def list_view_decls(view):
     return list_decls(content, view.file_name())
 
 
-def to_test_class_name(name):
-    if name[:1].isupper():
-        return 'Test{0}'.format(name)
-    else:
-        return 'Test_{0}'.format(name)
-
-
-def to_test_method_name(name):
-    if name == '__init__':
-        name = 'ctor'
-    elif name == '__call__':
-        name = 'call'
-    return 'test_{0}'.format(name)
-
-
 def to_main_name(name):
     if name.startswith('Test_'):
         return name[5:]
@@ -441,11 +426,11 @@ class TestCodeNavigator(CodeNavigator):
 
         name = decls[0].name
         self.template_vars['name'] = name
-        self.template_vars['testname'] = to_test_class_name(name)
+        self.template_vars['testname'] = self.testgen.to_test_class_name(name)
 
         if self.generate and not target_view.size():
             # The test module is empty or doesn't exist, so create it.
-            content = self.testgen.make_test_head(**self.template_vars)
+            content = self.testgen.make_test_head(self.template_vars)
             insert_rows(target_view, 0, content)
 
         try:
@@ -464,12 +449,13 @@ class TestCodeNavigator(CodeNavigator):
         sublime.status_message("SublimePythonGotoTest: "
                                "goto_class {0}".format(class_decl.name))
 
+        convert_name = self.testgen.to_test_class_name
         target_decl, f_row, l_row = self.traverse(target_view,
                                                   class_decl.name,
-                                                  to_test_class_name)
+                                                  convert_name)
 
         if target_decl is None and self.generate:
-            content = self.testgen.make_class_test(**self.template_vars)
+            content = self.testgen.make_class_test(self.template_vars)
             insert_rows(target_view, f_row, content)
         else:
             show_rows(target_view, f_row, l_row)
@@ -478,12 +464,13 @@ class TestCodeNavigator(CodeNavigator):
         sublime.status_message("SublimePythonGotoTest: "
                                "goto_func {0}".format(func_decl.name))
 
+        convert_name = self.testgen.to_test_class_name
         target_decl, f_row, l_row = self.traverse(target_view,
                                                   func_decl.name,
-                                                  to_test_class_name)
+                                                  convert_name)
 
         if target_decl is None and self.generate:
-            content = self.testgen.make_function_test(**self.template_vars)
+            content = self.testgen.make_function_test(self.template_vars)
             insert_rows(target_view, f_row + 1, content)
         else:
             show_rows(target_view, f_row, l_row)
@@ -493,24 +480,25 @@ class TestCodeNavigator(CodeNavigator):
                                "goto_method {0}.{1}".format(class_decl.name,
                                                             method_decl.name))
 
+        convert_name = self.testgen.to_test_class_name
         target_class_decl, f_row, l_row = self.traverse(target_view,
                                                         class_decl.name,
-                                                        to_test_class_name)
+                                                        convert_name)
 
         if target_class_decl is None and self.generate:
-            content = self.testgen.make_class_test(**self.template_vars)
+            content = self.testgen.make_class_test(self.template_vars)
             insert_rows(target_view, f_row, content)
 
             # Re-read the declarations.
             tup = self.traverse(target_view,
                                 class_decl.name,
-                                to_test_class_name)
+                                convert_name)
             target_class_decl, f_row, l_row = tup
 
         if target_class_decl is not None:
             tup = self.traverse(target_view=target_view,
                                 source_name=method_decl.name,
-                                convert_name=to_test_method_name,
+                                convert_name=self.testgen.to_test_method_name,
                                 source_decls=class_decl.children,
                                 target_decls=target_class_decl.children,
                                 parent_target_decl=target_class_decl,
@@ -522,9 +510,9 @@ class TestCodeNavigator(CodeNavigator):
                 template_vars.update(self.template_vars)
                 template_vars['name'] = method_decl.name
                 template_vars['testname'] = \
-                    to_test_method_name(method_decl.name)
+                    self.testgen.to_test_method_name(method_decl.name)
                 template_vars['classname'] = class_decl.name
-                content = self.testgen.make_method_test(**template_vars)
+                content = self.testgen.make_method_test(template_vars)
                 insert_rows(target_view, f_row, content, margin=1)
                 return
 
@@ -539,7 +527,9 @@ class MainCodeNavigator(CodeNavigator):
 class CustomTestGenerator(object):
     """Use the lineage of __testgen__.py modules to generate tests."""
 
-    func_names = ('make_test_head',
+    func_names = ('to_test_class_name',
+                  'to_test_method_name',
+                  'make_test_head',
                   'make_function_test',
                   'make_class_test',
                   'make_method_test')
