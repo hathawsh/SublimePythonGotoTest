@@ -2,8 +2,8 @@
 
 Generate test stubs from templates. Used by SublimePythonGotoTest.
 
-This particular __testgen__.py is designed for writing tests of code that uses
-the Pyramid framework, but you can easily customize this by adding your own
+This particular __testgen__.py is designed for writing code based on the
+Pyramid framework, but you can easily customize this by adding your own
 __testgen__.py to your source tree. The SublimePythonGotoTest plugin looks for
 __testgen__.py in your test directory and all of its parent directories. It
 calls these functions:
@@ -116,9 +116,18 @@ def make_class_test(template_vars):
 method_test_template = """\
     def {testname}(self):
         obj = self._make()
-        obj.{name}()
+"""
+
+method_test_template2 = """\
+        obj{opname}()
 """
 
 
 def make_method_test(template_vars):
-    return method_test_template.format(**template_vars)
+    s = method_test_template.format(**template_vars)
+    name = template_vars['name']
+    if name == '__call__':
+        s += method_test_template2.format(opname='')
+    elif name != '__init__':
+        s += method_test_template2.format(opname='.' + name)
+    return s
