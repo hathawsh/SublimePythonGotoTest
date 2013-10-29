@@ -1,6 +1,0 @@
-<snippet>
-    <content><![CDATA[self.assertIsNotInstance(${1:obj}, ${2:type})]]></content>
-    <tabTrigger>aini</tabTrigger>
-    <scope>source.python</scope>
-    <description>.assertIsNotInstance</description>
-</snippet>
