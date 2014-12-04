@@ -1,0 +1,9 @@
+<snippet>
+    <content><![CDATA[self.assertEqual(
+    set($1),
+    set($2))]]>
+</content>
+    <tabTrigger>aes</tabTrigger>
+    <scope>source.python</scope>
+    <description>.assertEqual(set(), set())</description>
+</snippet>
