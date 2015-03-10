@@ -56,7 +56,7 @@ def to_test_method_name(name):
 
 
 test_head_template = '''\
-from pyramid import testing
+import pyramid.testing
 
 try:
     # Python < 2.7
@@ -75,10 +75,10 @@ function_test_template = """\
 class {testname}(unittest.TestCase):
 
     def setUp(self):
-        self.config = testing.setUp()
+        self.config = pyramid.testing.setUp()
 
     def tearDown(self):
-        testing.tearDown()
+        pyramid.testing.tearDown()
 
     def _call(self, *args, **kw):
         from ..{relmodule} import {name}
@@ -94,10 +94,10 @@ class_test_template = """\
 class {testname}(unittest.TestCase):
 
     def setUp(self):
-        self.config = testing.setUp()
+        self.config = pyramid.testing.setUp()
 
     def tearDown(self):
-        testing.tearDown()
+        pyramid.testing.tearDown()
 
     @property
     def _class(self):
