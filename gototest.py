@@ -6,6 +6,22 @@ import sublime
 import sublime_plugin
 import weakref
 
+
+try:
+    # Python 2
+    execfile
+
+except NameError:
+
+    # Python 3
+    exe = eval('exec')  # Shield from Python 2 syntax errors
+
+    def execfile(fn, global_vars, local_vars):
+        with open(fn) as f:
+            code = compile(f.read(), fn, 'exec')
+            exe(code, global_vars, local_vars)
+
+
 empty_line_re = re.compile(r'\s*$')
 _deferred = {}  # {filename: CodeNavigator}
 here = os.path.abspath(os.path.dirname(__file__))
@@ -263,6 +279,13 @@ def show_rows(view, first_row, last_row):
     view.show(first_point)
 
 
+class InsertAtCommand(sublime_plugin.TextCommand):
+    """Like the insert command, but insert at a specific point."""
+    def run(self, edit, point, string):
+        view = self.view
+        view.insert(edit, point, string)
+
+
 def insert_rows(view, row, content, margin=2):
     point = view.text_point(row, 0)
 
@@ -293,9 +316,7 @@ def insert_rows(view, row, content, margin=2):
             if blanks < margin:
                 content = content + '\n' * (margin - blanks)
 
-    edit = view.begin_edit('insert_test')
-    view.insert(edit, point, content)
-    view.end_edit(edit)
+    view.run_command('insert_at', {'point': point, 'string': content})
     view.sel().clear()
     region = sublime.Region(point, point + len(content))
     view.sel().add(region)
