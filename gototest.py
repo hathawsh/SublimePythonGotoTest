@@ -12,7 +12,6 @@ try:
     execfile
 
 except NameError:
-
     # Python 3
     exe = eval('exec')  # Shield from Python 2 syntax errors
 
