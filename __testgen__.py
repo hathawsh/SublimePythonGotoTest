@@ -57,13 +57,7 @@ def to_test_method_name(name):
 
 test_head_template = '''\
 import pyramid.testing
-
-try:
-    # Python < 2.7
-    import unittest2 as unittest  # NOQA
-except ImportError:
-    # Python >= 2.7
-    import unittest  # NOQA
+import unittest
 '''
 
 
