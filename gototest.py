@@ -416,8 +416,7 @@ class CodeNavigator(object):
         elif mode == 'prefix_under':
             prefix = name + '_'
             matches = []
-            items = decl_map.items()
-            items.sort()
+            items = sorted(decl_map.items())
             for key, decl in items:
                 if key == name or key.startswith(prefix):
                     matches.append(decl)
